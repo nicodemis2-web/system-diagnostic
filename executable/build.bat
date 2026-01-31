@@ -145,14 +145,18 @@ echo.
 
 REM Run PyInstaller with the spec file
 %PYTHON_CMD% -m PyInstaller --noconfirm executable\SystemDiagnostic.spec
+set "PYINSTALLER_EXIT=%errorlevel%"
 
-if errorlevel 1 (
+REM Check if build succeeded by looking for output files
+if not exist "dist\SystemDiagnostic\SystemDiagnostic.exe" (
     echo.
     echo ========================================
     echo  ERROR: Build failed
     echo ========================================
     echo.
+    echo The executable was not created.
     echo Check the output above for specific errors.
+    echo.
     echo Common issues:
     echo   - Missing dependencies (run pip install again)
     echo   - Antivirus blocking PyInstaller
