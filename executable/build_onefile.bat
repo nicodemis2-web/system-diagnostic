@@ -149,7 +149,6 @@ REM Build single file executable
     --hidden-import pythoncom ^
     --hidden-import diagnostics.hidden_processes ^
     --hidden-import diagnostics.hidden_directories ^
-    --hidden-import diagnostics.network_connections ^
     main.py
 
 if errorlevel 1 (

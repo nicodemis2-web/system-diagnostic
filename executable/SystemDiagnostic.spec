@@ -39,7 +39,6 @@ a = Analysis(
         'diagnostics.scheduled',
         'diagnostics.hidden_processes',
         'diagnostics.hidden_directories',
-        'diagnostics.network_connections',
         'ui',
         'ui.main_window',
         'ui.results_panel',
