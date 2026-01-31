@@ -372,10 +372,15 @@ class ResultsPanel(ctk.CTkFrame):
         # Update network card
         if 'network' in summaries:
             s = summaries['network']
-            issues = s.get('suspicious', 0) + s.get('orphaned', 0)
-            critical = s.get('Critical', 0)
-            status = 'critical' if critical > 0 else 'warning' if issues > 0 else 'ok'
-            self.summary_cards['network'].update_value(str(issues), status)
+            scan_error = s.get('scan_error')
+            if scan_error:
+                # Show error state if scan failed/timed out
+                self.summary_cards['network'].update_value('!', 'warning')
+            else:
+                issues = s.get('suspicious', 0) + s.get('orphaned', 0)
+                critical = s.get('Critical', 0)
+                status = 'critical' if critical > 0 else 'warning' if issues > 0 else 'ok'
+                self.summary_cards['network'].update_value(str(issues), status)
 
         # Generate recommendations
         self._generate_recommendations(summaries)
@@ -453,12 +458,16 @@ class ResultsPanel(ctk.CTkFrame):
         # Check network connections
         if 'network' in summaries:
             s = summaries['network']
-            suspicious_ports = s.get('suspicious', 0)
-            orphaned = s.get('orphaned', 0)
-            if suspicious_ports > 0:
-                recommendations.append(('critical', f"{suspicious_ports} connection(s) using suspicious ports commonly used by malware. Investigate immediately."))
-            if orphaned > 0:
-                recommendations.append(('warning', f"{orphaned} orphaned network connection(s) found (process no longer exists)."))
+            scan_error = s.get('scan_error')
+            if scan_error:
+                recommendations.append(('warning', f"Network scan encountered an issue: {scan_error}. Try running as Administrator."))
+            else:
+                suspicious_ports = s.get('suspicious', 0)
+                orphaned = s.get('orphaned', 0)
+                if suspicious_ports > 0:
+                    recommendations.append(('critical', f"{suspicious_ports} connection(s) using suspicious ports commonly used by malware. Investigate immediately."))
+                if orphaned > 0:
+                    recommendations.append(('warning', f"{orphaned} orphaned network connection(s) found (process no longer exists)."))
 
         # Add recommendations or show "all good" message
         if not recommendations:

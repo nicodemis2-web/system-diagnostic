@@ -2,7 +2,9 @@
 
 import psutil
 import socket
-from typing import List, Dict, Any
+import threading
+import concurrent.futures
+from typing import List, Dict, Any, Optional
 
 
 class NetworkConnectionAnalyzer:
@@ -20,8 +22,12 @@ class NetworkConnectionAnalyzer:
         123, 67, 68, 137, 138, 139, 445, 3306, 5432, 27017
     }
 
+    # Timeout for network connection enumeration (in seconds)
+    SCAN_TIMEOUT = 30
+
     def __init__(self):
         self.items: List[Dict[str, Any]] = []
+        self._scan_error: Optional[str] = None
 
     def _get_process_info(self, pid: int) -> Dict[str, str]:
         """Get process name and path for a PID."""
@@ -101,18 +107,53 @@ class NetworkConnectionAnalyzer:
                     addr.port if hasattr(addr, 'port') else addr[1])
         return ('*', 0)
 
+    def _get_connections_with_timeout(self, kind: str = 'all') -> Optional[List]:
+        """Get network connections with a timeout to prevent hanging."""
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(psutil.net_connections, kind)
+                return future.result(timeout=self.SCAN_TIMEOUT)
+        except concurrent.futures.TimeoutError:
+            self._scan_error = f"Network scan timed out after {self.SCAN_TIMEOUT} seconds"
+            return None
+        except psutil.AccessDenied:
+            return None
+        except Exception as e:
+            self._scan_error = str(e)
+            return None
+
     def scan(self) -> List[Dict[str, Any]]:
         """Scan all network connections for suspicious activity."""
         self.items = []
+        self._scan_error = None
 
-        try:
-            connections = psutil.net_connections(kind='all')
-        except psutil.AccessDenied:
-            # Without admin, we can only see our own connections
-            try:
-                connections = psutil.net_connections(kind='inet')
-            except psutil.AccessDenied:
-                return self.items
+        # Try to get all connections with timeout
+        connections = self._get_connections_with_timeout(kind='all')
+
+        if connections is None:
+            # Without admin or on timeout, try inet only
+            connections = self._get_connections_with_timeout(kind='inet')
+
+        if connections is None:
+            # If still failing, return empty with error info
+            if self._scan_error:
+                self.items.append({
+                    'protocol': 'N/A',
+                    'local_address': '',
+                    'local_port': 0,
+                    'remote_address': '',
+                    'remote_port': 0,
+                    'local_display': 'Scan Error',
+                    'remote_display': '',
+                    'status': 'Error',
+                    'pid': 0,
+                    'process_name': 'N/A',
+                    'process_path': '',
+                    'flags': ['scan_error'],
+                    'severity': 'Warning',
+                    'details': self._scan_error
+                })
+            return self.items
 
         for conn in connections:
             try:
@@ -190,7 +231,7 @@ class NetworkConnectionAnalyzer:
 
         return self.items
 
-    def get_summary(self) -> Dict[str, int]:
+    def get_summary(self) -> Dict[str, Any]:
         """Get summary counts."""
         summary = {
             'total': len(self.items),
@@ -200,7 +241,8 @@ class NetworkConnectionAnalyzer:
             'listening': 0,
             'Critical': 0,
             'Warning': 0,
-            'OK': 0
+            'OK': 0,
+            'scan_error': self._scan_error
         }
 
         for item in self.items:
@@ -208,6 +250,9 @@ class NetworkConnectionAnalyzer:
             summary[severity] = summary.get(severity, 0) + 1
 
             flags = item.get('flags', [])
+            if 'scan_error' in flags:
+                # Don't count error entries in other stats
+                continue
             if 'suspicious_port' in flags:
                 summary['suspicious'] += 1
             if 'orphaned' in flags:
