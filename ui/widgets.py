@@ -4,18 +4,49 @@ import customtkinter as ctk
 from typing import List, Dict, Any, Optional, Callable
 
 
+# Professional color scheme inspired by enterprise tech design
+class Colors:
+    """Professional color palette."""
+    # Primary colors
+    PRIMARY_BLUE = "#2ea3f2"
+    PRIMARY_BLUE_HOVER = "#1a8cd8"
+    PRIMARY_BLUE_DARK = "#1e6fa8"
+
+    # Backgrounds
+    BG_DARK = "#1a1a2e"
+    BG_DARKER = "#12121f"
+    BG_CARD = "#232340"
+    BG_CARD_ALT = "#1e1e35"
+    BG_HEADER = "#16213e"
+
+    # Text colors
+    TEXT_PRIMARY = "#ffffff"
+    TEXT_SECONDARY = "#a0a0b0"
+    TEXT_MUTED = "#6c6c7c"
+
+    # Status colors
+    SUCCESS = "#10b981"
+    WARNING = "#f59e0b"
+    DANGER = "#ef4444"
+    INFO = "#3b82f6"
+
+    # Borders
+    BORDER = "#2a2a45"
+    BORDER_LIGHT = "#3a3a55"
+
+
 class StatusIndicator(ctk.CTkFrame):
     """A colored status indicator widget."""
 
     COLORS = {
-        'critical': '#dc3545',
-        'high': '#dc3545',
-        'warning': '#ffc107',
-        'medium': '#ffc107',
-        'ok': '#28a745',
-        'low': '#28a745',
-        'info': '#17a2b8',
-        'unknown': '#6c757d'
+        'critical': Colors.DANGER,
+        'high': Colors.DANGER,
+        'warning': Colors.WARNING,
+        'medium': Colors.WARNING,
+        'ok': Colors.SUCCESS,
+        'low': Colors.SUCCESS,
+        'info': Colors.INFO,
+        'unknown': Colors.TEXT_MUTED
     }
 
     def __init__(self, master, status: str = 'ok', text: str = '', **kwargs):
@@ -29,15 +60,16 @@ class StatusIndicator(ctk.CTkFrame):
             self,
             text="●",
             text_color=color,
-            font=ctk.CTkFont(size=14)
+            font=ctk.CTkFont(size=12)
         )
-        self.indicator.pack(side="left", padx=(0, 5))
+        self.indicator.pack(side="left", padx=(0, 6))
 
         if text:
             self.label = ctk.CTkLabel(
                 self,
                 text=text,
-                font=ctk.CTkFont(size=12)
+                font=ctk.CTkFont(family="Segoe UI", size=12),
+                text_color=Colors.TEXT_PRIMARY
             )
             self.label.pack(side="left")
 
@@ -55,25 +87,39 @@ class ProgressCard(ctk.CTkFrame):
     def __init__(self, master, title: str = "Scanning...", **kwargs):
         super().__init__(master, **kwargs)
 
-        self.configure(corner_radius=10)
+        self.configure(
+            corner_radius=8,
+            fg_color=Colors.BG_CARD,
+            border_width=1,
+            border_color=Colors.BORDER
+        )
 
         self.title_label = ctk.CTkLabel(
             self,
             text=title,
-            font=ctk.CTkFont(size=14, weight="bold")
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+            text_color=Colors.TEXT_PRIMARY
         )
-        self.title_label.pack(pady=(15, 5), padx=15)
+        self.title_label.pack(pady=(20, 8), padx=20)
 
-        self.progress_bar = ctk.CTkProgressBar(self, width=300)
-        self.progress_bar.pack(pady=10, padx=15)
+        self.progress_bar = ctk.CTkProgressBar(
+            self,
+            width=350,
+            height=8,
+            corner_radius=4,
+            progress_color=Colors.PRIMARY_BLUE,
+            fg_color=Colors.BG_DARKER
+        )
+        self.progress_bar.pack(pady=12, padx=20)
         self.progress_bar.set(0)
 
         self.status_label = ctk.CTkLabel(
             self,
             text="Initializing...",
-            font=ctk.CTkFont(size=12)
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            text_color=Colors.TEXT_SECONDARY
         )
-        self.status_label.pack(pady=(0, 15), padx=15)
+        self.status_label.pack(pady=(0, 20), padx=20)
 
     def set_progress(self, value: float, status: str = None):
         """Update progress (0.0 to 1.0) and optional status text."""
@@ -92,26 +138,39 @@ class ResultsTable(ctk.CTkScrollableFrame):
     def __init__(self, master, columns: List[str], **kwargs):
         super().__init__(master, **kwargs)
 
+        self.configure(fg_color="transparent")
+
         self.columns = columns
         self.rows: List[ctk.CTkFrame] = []
         self.header_frame: Optional[ctk.CTkFrame] = None
+        self.col_count = len(columns)
 
         # Create header
         self._create_header()
 
     def _create_header(self):
         """Create the table header row."""
-        self.header_frame = ctk.CTkFrame(self, fg_color=("gray85", "gray25"))
-        self.header_frame.pack(fill="x", pady=(0, 2))
+        self.header_frame = ctk.CTkFrame(
+            self,
+            fg_color=Colors.BG_HEADER,
+            corner_radius=6
+        )
+        self.header_frame.pack(fill="x", pady=(0, 4))
+
+        # Configure grid columns for header
+        for i in range(self.col_count):
+            self.header_frame.grid_columnconfigure(i, weight=1, uniform="col")
 
         for i, col in enumerate(self.columns):
             label = ctk.CTkLabel(
                 self.header_frame,
-                text=col,
-                font=ctk.CTkFont(size=12, weight="bold"),
-                anchor="w"
+                text=col.upper(),
+                font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+                text_color=Colors.TEXT_SECONDARY,
+                anchor="w",
+                justify="left"
             )
-            label.pack(side="left", fill="x", expand=True, padx=10, pady=8)
+            label.grid(row=0, column=i, sticky="w", padx=12, pady=12)
 
     def clear(self):
         """Clear all data rows."""
@@ -121,26 +180,38 @@ class ResultsTable(ctk.CTkScrollableFrame):
 
     def add_row(self, values: List[str], severity: str = 'ok'):
         """Add a row to the table."""
-        row_frame = ctk.CTkFrame(self, fg_color="transparent")
-        row_frame.pack(fill="x", pady=1)
-
         # Alternate row colors
         if len(self.rows) % 2 == 0:
-            row_frame.configure(fg_color=("gray95", "gray17"))
+            bg_color = Colors.BG_CARD
+        else:
+            bg_color = Colors.BG_CARD_ALT
+
+        row_frame = ctk.CTkFrame(
+            self,
+            fg_color=bg_color,
+            corner_radius=4
+        )
+        row_frame.pack(fill="x", pady=1)
+
+        # Configure grid columns for row
+        for i in range(self.col_count):
+            row_frame.grid_columnconfigure(i, weight=1, uniform="col")
 
         for i, value in enumerate(values):
             # Check if this is a severity column
-            if i < len(self.columns) and self.columns[i].lower() in ['severity', 'impact', 'status']:
+            if i < len(self.columns) and self.columns[i].lower() in ['severity', 'impact']:
                 indicator = StatusIndicator(row_frame, status=str(value), text=str(value))
-                indicator.pack(side="left", fill="x", expand=True, padx=10, pady=6)
+                indicator.grid(row=0, column=i, sticky="w", padx=12, pady=10)
             else:
                 label = ctk.CTkLabel(
                     row_frame,
                     text=str(value),
-                    font=ctk.CTkFont(size=11),
-                    anchor="w"
+                    font=ctk.CTkFont(family="Segoe UI", size=12),
+                    text_color=Colors.TEXT_PRIMARY,
+                    anchor="w",
+                    justify="left"
                 )
-                label.pack(side="left", fill="x", expand=True, padx=10, pady=6)
+                label.grid(row=0, column=i, sticky="w", padx=12, pady=10)
 
         self.rows.append(row_frame)
 
@@ -172,53 +243,58 @@ class SummaryCard(ctk.CTkFrame):
     def __init__(self, master, title: str, value: str, subtitle: str = '', status: str = 'info', **kwargs):
         super().__init__(master, **kwargs)
 
-        self.configure(corner_radius=10)
+        self.configure(
+            corner_radius=8,
+            fg_color=Colors.BG_CARD,
+            border_width=1,
+            border_color=Colors.BORDER
+        )
 
         self.title_label = ctk.CTkLabel(
             self,
-            text=title,
-            font=ctk.CTkFont(size=12),
-            text_color=("gray50", "gray60")
+            text=title.upper(),
+            font=ctk.CTkFont(family="Segoe UI", size=10, weight="bold"),
+            text_color=Colors.TEXT_MUTED
         )
-        self.title_label.pack(pady=(15, 5), padx=15)
+        self.title_label.pack(pady=(16, 4), padx=16, anchor="w")
 
         # Status color
         colors = {
-            'critical': '#dc3545',
-            'warning': '#ffc107',
-            'ok': '#28a745',
-            'info': '#17a2b8'
+            'critical': Colors.DANGER,
+            'warning': Colors.WARNING,
+            'ok': Colors.SUCCESS,
+            'info': Colors.PRIMARY_BLUE
         }
         color = colors.get(status.lower(), colors['info'])
 
         self.value_label = ctk.CTkLabel(
             self,
             text=value,
-            font=ctk.CTkFont(size=28, weight="bold"),
+            font=ctk.CTkFont(family="Segoe UI", size=32, weight="bold"),
             text_color=color
         )
-        self.value_label.pack(pady=0, padx=15)
+        self.value_label.pack(pady=(0, 4), padx=16, anchor="w")
 
         if subtitle:
             self.subtitle_label = ctk.CTkLabel(
                 self,
                 text=subtitle,
-                font=ctk.CTkFont(size=11),
-                text_color=("gray50", "gray60")
+                font=ctk.CTkFont(family="Segoe UI", size=11),
+                text_color=Colors.TEXT_SECONDARY
             )
-            self.subtitle_label.pack(pady=(0, 15), padx=15)
+            self.subtitle_label.pack(pady=(0, 16), padx=16, anchor="w")
         else:
-            self.value_label.pack_configure(pady=(0, 15))
+            self.value_label.pack_configure(pady=(0, 16))
 
     def update_value(self, value: str, status: str = None):
         """Update the displayed value."""
         self.value_label.configure(text=value)
         if status:
             colors = {
-                'critical': '#dc3545',
-                'warning': '#ffc107',
-                'ok': '#28a745',
-                'info': '#17a2b8'
+                'critical': Colors.DANGER,
+                'warning': Colors.WARNING,
+                'ok': Colors.SUCCESS,
+                'info': Colors.PRIMARY_BLUE
             }
             color = colors.get(status.lower(), colors['info'])
             self.value_label.configure(text_color=color)
@@ -229,24 +305,65 @@ class ActionButton(ctk.CTkButton):
 
     def __init__(self, master, text: str, icon: str = '', command: Callable = None, style: str = 'primary', **kwargs):
         # Set colors based on style
-        colors = {
-            'primary': ("#1a73e8", "#1557b0"),
-            'secondary': ("gray70", "gray30"),
-            'success': ("#28a745", "#1e7b34"),
-            'danger': ("#dc3545", "#a71d2a")
-        }
-        fg_color = colors.get(style, colors['primary'])
+        if style == 'primary':
+            fg_color = Colors.PRIMARY_BLUE
+            hover_color = Colors.PRIMARY_BLUE_HOVER
+            text_color = Colors.TEXT_PRIMARY
+        elif style == 'secondary':
+            fg_color = Colors.BG_CARD
+            hover_color = Colors.BG_CARD_ALT
+            text_color = Colors.TEXT_PRIMARY
+        elif style == 'success':
+            fg_color = Colors.SUCCESS
+            hover_color = "#0ea572"
+            text_color = Colors.TEXT_PRIMARY
+        elif style == 'danger':
+            fg_color = Colors.DANGER
+            hover_color = "#dc2626"
+            text_color = Colors.TEXT_PRIMARY
+        else:
+            fg_color = Colors.PRIMARY_BLUE
+            hover_color = Colors.PRIMARY_BLUE_HOVER
+            text_color = Colors.TEXT_PRIMARY
 
-        display_text = f"{icon} {text}" if icon else text
+        display_text = f"{icon}  {text}" if icon else text
 
         super().__init__(
             master,
             text=display_text,
             command=command,
-            font=ctk.CTkFont(size=13, weight="bold"),
-            fg_color=fg_color[0],
-            hover_color=fg_color[1],
-            corner_radius=8,
-            height=40,
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            fg_color=fg_color,
+            hover_color=hover_color,
+            text_color=text_color,
+            corner_radius=6,
+            height=42,
+            border_width=0,
             **kwargs
         )
+
+
+class SectionHeader(ctk.CTkFrame):
+    """A section header with title and optional subtitle."""
+
+    def __init__(self, master, title: str, subtitle: str = '', **kwargs):
+        super().__init__(master, **kwargs)
+
+        self.configure(fg_color="transparent")
+
+        self.title_label = ctk.CTkLabel(
+            self,
+            text=title,
+            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+            text_color=Colors.TEXT_PRIMARY
+        )
+        self.title_label.pack(anchor="w")
+
+        if subtitle:
+            self.subtitle_label = ctk.CTkLabel(
+                self,
+                text=subtitle,
+                font=ctk.CTkFont(family="Segoe UI", size=12),
+                text_color=Colors.TEXT_SECONDARY
+            )
+            self.subtitle_label.pack(anchor="w", pady=(2, 0))

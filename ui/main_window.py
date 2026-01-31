@@ -8,7 +8,7 @@ from typing import Optional, Callable
 from tkinter import filedialog, messagebox
 
 from ui.results_panel import ResultsPanel
-from ui.widgets import ActionButton, ProgressCard
+from ui.widgets import ActionButton, ProgressCard, Colors
 from utils.admin import is_admin, get_admin_status_text
 from utils.report import ReportGenerator
 from diagnostics import (
@@ -29,12 +29,12 @@ class MainWindow(ctk.CTk):
 
         # Window setup
         self.title("Windows System Diagnostic Tool")
-        self.geometry("1100x750")
-        self.minsize(900, 600)
+        self.geometry("1200x800")
+        self.minsize(1000, 700)
 
-        # Set appearance
+        # Set appearance - use custom dark theme
         ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("blue")
+        self.configure(fg_color=Colors.BG_DARK)
 
         # Initialize analyzers
         self.startup_analyzer = StartupAnalyzer()
@@ -63,130 +63,183 @@ class MainWindow(ctk.CTk):
         """Build the main UI layout."""
         # Configure grid
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(2, weight=1)
 
-        # Header with system info
+        # Header
         self._build_header()
 
-        # Action buttons
+        # Action bar
         self._build_action_bar()
 
-        # Progress indicator (hidden by default)
-        self._build_progress_section()
-
-        # Results panel
-        self._build_results_section()
+        # Main content area
+        self._build_main_content()
 
         # Status bar
         self._build_status_bar()
 
     def _build_header(self):
         """Build the header section with system info."""
-        header_frame = ctk.CTkFrame(self, corner_radius=0)
-        header_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=0)
+        header_frame = ctk.CTkFrame(
+            self,
+            fg_color=Colors.BG_HEADER,
+            corner_radius=0,
+            height=70
+        )
+        header_frame.grid(row=0, column=0, sticky="ew")
+        header_frame.grid_propagate(False)
 
-        # Title
+        # Inner container for padding
+        inner = ctk.CTkFrame(header_frame, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=24, pady=0)
+
+        # Left side - Title
+        title_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        title_frame.pack(side="left", fill="y", pady=12)
+
         title_label = ctk.CTkLabel(
-            header_frame,
-            text="Windows System Diagnostic Tool",
-            font=ctk.CTkFont(size=20, weight="bold")
+            title_frame,
+            text="System Diagnostic",
+            font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
+            text_color=Colors.TEXT_PRIMARY
         )
-        title_label.pack(side="left", padx=20, pady=15)
+        title_label.pack(anchor="w")
 
-        # System info
-        self.system_info_label = ctk.CTkLabel(
-            header_frame,
-            text="Loading system info...",
-            font=ctk.CTkFont(size=12),
-            text_color=("gray50", "gray60")
+        subtitle_label = ctk.CTkLabel(
+            title_frame,
+            text="Windows Performance & Health Analysis",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            text_color=Colors.TEXT_SECONDARY
         )
-        self.system_info_label.pack(side="right", padx=20, pady=15)
+        subtitle_label.pack(anchor="w")
+
+        # Right side - System info
+        info_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        info_frame.pack(side="right", fill="y", pady=12)
+
+        self.system_info_label = ctk.CTkLabel(
+            info_frame,
+            text="Loading system info...",
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            text_color=Colors.TEXT_SECONDARY,
+            justify="right"
+        )
+        self.system_info_label.pack(anchor="e")
+
+        # Admin status
+        admin_text = "Administrator" if is_admin() else "Standard User"
+        admin_color = Colors.SUCCESS if is_admin() else Colors.WARNING
+        self.admin_label = ctk.CTkLabel(
+            info_frame,
+            text=f"● {admin_text}",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=admin_color
+        )
+        self.admin_label.pack(anchor="e", pady=(4, 0))
 
     def _build_action_bar(self):
         """Build the action buttons bar."""
         action_frame = ctk.CTkFrame(self, fg_color="transparent")
-        action_frame.grid(row=1, column=0, sticky="ew", padx=15, pady=10)
+        action_frame.grid(row=1, column=0, sticky="ew", padx=24, pady=16)
+
+        # Buttons container
+        btn_container = ctk.CTkFrame(action_frame, fg_color="transparent")
+        btn_container.pack(side="left")
 
         # Full scan button
         self.full_scan_btn = ActionButton(
-            action_frame,
+            btn_container,
             text="Run Full Scan",
-            icon="🔍",
+            icon="⬤",
             command=self._run_full_scan,
-            style="primary"
+            style="primary",
+            width=160
         )
-        self.full_scan_btn.pack(side="left", padx=5)
+        self.full_scan_btn.pack(side="left", padx=(0, 12))
 
         # Quick scan button
         self.quick_scan_btn = ActionButton(
-            action_frame,
+            btn_container,
             text="Quick Scan",
-            icon="⚡",
+            icon="◐",
             command=self._run_quick_scan,
-            style="secondary"
+            style="secondary",
+            width=140
         )
-        self.quick_scan_btn.pack(side="left", padx=5)
+        self.quick_scan_btn.pack(side="left", padx=(0, 12))
 
         # Export button
         self.export_btn = ActionButton(
-            action_frame,
+            btn_container,
             text="Export Report",
-            icon="📄",
+            icon="↗",
             command=self._export_report,
-            style="secondary"
+            style="secondary",
+            width=140
         )
-        self.export_btn.pack(side="left", padx=5)
+        self.export_btn.pack(side="left")
 
-        # Admin status
-        admin_text = "✓ Admin" if is_admin() else "⚠ Limited"
-        admin_color = "#28a745" if is_admin() else "#ffc107"
-        self.admin_label = ctk.CTkLabel(
-            action_frame,
-            text=admin_text,
-            font=ctk.CTkFont(size=11),
-            text_color=admin_color
-        )
-        self.admin_label.pack(side="right", padx=15)
-
-    def _build_progress_section(self):
-        """Build the progress indicator section."""
-        self.progress_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.progress_frame.grid(row=2, column=0, sticky="ew", padx=15, pady=5)
+        # Progress card (hidden by default)
+        self.progress_frame = ctk.CTkFrame(action_frame, fg_color="transparent")
+        self.progress_frame.pack(side="right")
 
         self.progress_card = ProgressCard(self.progress_frame, title="Scanning...")
-        # Don't pack initially - will be shown during scan
 
-    def _build_results_section(self):
-        """Build the results panel section."""
-        self.results_panel = ResultsPanel(self)
-        self.results_panel.grid(row=3, column=0, sticky="nsew", padx=15, pady=10)
+    def _build_main_content(self):
+        """Build the main content area with results panel."""
+        content_frame = ctk.CTkFrame(
+            self,
+            fg_color=Colors.BG_DARKER,
+            corner_radius=12
+        )
+        content_frame.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 16))
+
+        self.results_panel = ResultsPanel(content_frame)
+        self.results_panel.pack(fill="both", expand=True, padx=2, pady=2)
 
     def _build_status_bar(self):
         """Build the status bar."""
-        status_frame = ctk.CTkFrame(self, corner_radius=0, height=30)
-        status_frame.grid(row=4, column=0, sticky="ew")
+        status_frame = ctk.CTkFrame(
+            self,
+            fg_color=Colors.BG_HEADER,
+            corner_radius=0,
+            height=36
+        )
+        status_frame.grid(row=3, column=0, sticky="ew")
+        status_frame.grid_propagate(False)
 
         self.status_label = ctk.CTkLabel(
             status_frame,
-            text="Ready. Click 'Run Full Scan' to begin.",
-            font=ctk.CTkFont(size=11),
-            text_color=("gray50", "gray60")
+            text="Ready  •  Click 'Run Full Scan' to analyze your system",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=Colors.TEXT_SECONDARY
         )
-        self.status_label.pack(side="left", padx=15, pady=5)
+        self.status_label.pack(side="left", padx=24, pady=8)
+
+        # Version info
+        version_label = ctk.CTkLabel(
+            status_frame,
+            text="v1.0.0",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=Colors.TEXT_MUTED
+        )
+        version_label.pack(side="right", padx=24, pady=8)
 
     def _update_system_info(self):
         """Update system information display."""
         try:
             # CPU info
             cpu_name = platform.processor() or "Unknown CPU"
-            if len(cpu_name) > 30:
-                cpu_name = cpu_name[:30] + "..."
+            # Truncate long CPU names
+            if len(cpu_name) > 40:
+                cpu_name = cpu_name[:40] + "..."
 
             # RAM info
             ram_gb = round(psutil.virtual_memory().total / (1024**3), 1)
 
-            # Basic system info string
-            info_text = f"{cpu_name} | RAM: {ram_gb} GB"
+            # OS info
+            os_info = f"{platform.system()} {platform.release()}"
+
+            info_text = f"{cpu_name}\n{ram_gb} GB RAM  •  {os_info}"
 
             self.system_info_label.configure(text=info_text)
 
@@ -194,12 +247,12 @@ class MainWindow(ctk.CTk):
             self.system_info = {
                 'CPU': cpu_name,
                 'RAM': f"{ram_gb} GB",
-                'OS': platform.system() + " " + platform.release(),
+                'OS': os_info,
                 'Architecture': platform.machine()
             }
 
         except Exception as e:
-            self.system_info_label.configure(text="Could not load system info")
+            self.system_info_label.configure(text="System info unavailable")
             self.system_info = {}
 
     def _set_buttons_enabled(self, enabled: bool):
@@ -218,8 +271,8 @@ class MainWindow(ctk.CTk):
         self._set_buttons_enabled(False)
 
         # Show progress
-        self.progress_card.pack(fill="x", padx=10, pady=10)
-        self.progress_card.set_progress(0, "Starting full scan...")
+        self.progress_card.pack(fill="x", padx=0, pady=0)
+        self.progress_card.set_progress(0, "Initializing full scan...")
 
         # Run scan in thread
         self.scan_thread = threading.Thread(target=self._perform_full_scan)
@@ -235,8 +288,8 @@ class MainWindow(ctk.CTk):
         self._set_buttons_enabled(False)
 
         # Show progress
-        self.progress_card.pack(fill="x", padx=10, pady=10)
-        self.progress_card.set_progress(0, "Starting quick scan...")
+        self.progress_card.pack(fill="x", padx=0, pady=0)
+        self.progress_card.set_progress(0, "Initializing quick scan...")
 
         # Run scan in thread
         self.scan_thread = threading.Thread(target=self._perform_quick_scan)
@@ -247,12 +300,12 @@ class MainWindow(ctk.CTk):
         """Perform full scan in background thread."""
         try:
             steps = [
-                ("Scanning startup programs...", self._scan_startup, 0.1),
-                ("Analyzing services...", self._scan_services, 0.25),
-                ("Monitoring processes...", self._scan_processes, 0.45),
+                ("Analyzing startup programs...", self._scan_startup, 0.1),
+                ("Scanning Windows services...", self._scan_services, 0.25),
+                ("Monitoring process resources...", self._scan_processes, 0.45),
                 ("Checking disk health...", self._scan_disk, 0.6),
-                ("Checking drivers...", self._scan_drivers, 0.75),
-                ("Analyzing scheduled tasks...", self._scan_scheduled, 0.9),
+                ("Analyzing drivers...", self._scan_drivers, 0.75),
+                ("Scanning scheduled tasks...", self._scan_scheduled, 0.9),
             ]
 
             for status, func, progress in steps:
@@ -269,8 +322,8 @@ class MainWindow(ctk.CTk):
         """Perform quick scan in background thread."""
         try:
             steps = [
-                ("Scanning startup programs...", self._scan_startup, 0.3),
-                ("Monitoring processes...", self._scan_processes, 0.7),
+                ("Analyzing startup programs...", self._scan_startup, 0.3),
+                ("Monitoring process resources...", self._scan_processes, 0.7),
             ]
 
             for status, func, progress in steps:
@@ -345,14 +398,27 @@ class MainWindow(ctk.CTk):
             self.summaries.get('drivers', {}).get('critical', 0) +
             self.summaries.get('disk', {}).get('low_space_drives', 0)
         )
-        self.status_label.configure(text=f"Scan complete. Found {total_issues} potential issues.")
+
+        if total_issues > 0:
+            self.status_label.configure(
+                text=f"Scan complete  •  Found {total_issues} item(s) requiring attention",
+                text_color=Colors.WARNING
+            )
+        else:
+            self.status_label.configure(
+                text="Scan complete  •  No critical issues found",
+                text_color=Colors.SUCCESS
+            )
 
     def _scan_error(self, error_msg: str):
         """Handle scan error."""
         self.is_scanning = False
         self._set_buttons_enabled(True)
         self.progress_card.pack_forget()
-        self.status_label.configure(text=f"Scan error: {error_msg}")
+        self.status_label.configure(
+            text=f"Scan error: {error_msg}",
+            text_color=Colors.DANGER
+        )
         messagebox.showerror("Scan Error", f"An error occurred during scanning:\n{error_msg}")
 
     def _export_report(self):
@@ -381,8 +447,11 @@ class MainWindow(ctk.CTk):
 
             # Save
             if self.report_generator.save_report(filepath):
-                self.status_label.configure(text=f"Report saved to: {filepath}")
-                messagebox.showinfo("Export Complete", f"Report saved successfully to:\n{filepath}")
+                self.status_label.configure(
+                    text=f"Report exported successfully",
+                    text_color=Colors.SUCCESS
+                )
+                messagebox.showinfo("Export Complete", f"Report saved to:\n{filepath}")
             else:
                 messagebox.showerror("Export Error", "Failed to save the report.")
 

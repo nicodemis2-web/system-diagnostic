@@ -2,7 +2,7 @@
 
 import customtkinter as ctk
 from typing import Dict, List, Any, Optional
-from ui.widgets import ResultsTable, SummaryCard, StatusIndicator
+from ui.widgets import ResultsTable, SummaryCard, StatusIndicator, Colors
 
 
 class ResultsPanel(ctk.CTkFrame):
@@ -14,8 +14,19 @@ class ResultsPanel(ctk.CTkFrame):
         self.configure(fg_color="transparent")
 
         # Create tabview
-        self.tabview = ctk.CTkTabview(self, corner_radius=10)
-        self.tabview.pack(fill="both", expand=True, padx=5, pady=5)
+        self.tabview = ctk.CTkTabview(
+            self,
+            corner_radius=8,
+            fg_color=Colors.BG_DARK,
+            segmented_button_fg_color=Colors.BG_CARD,
+            segmented_button_selected_color=Colors.PRIMARY_BLUE,
+            segmented_button_selected_hover_color=Colors.PRIMARY_BLUE_HOVER,
+            segmented_button_unselected_color=Colors.BG_CARD,
+            segmented_button_unselected_hover_color=Colors.BG_CARD_ALT,
+            text_color=Colors.TEXT_PRIMARY,
+            text_color_disabled=Colors.TEXT_MUTED
+        )
+        self.tabview.pack(fill="both", expand=True, padx=8, pady=8)
 
         # Create tabs
         self.tabs = {}
@@ -37,31 +48,36 @@ class ResultsPanel(ctk.CTkFrame):
 
         for tab_name, columns in tab_configs.items():
             tab = self.tabview.add(tab_name)
+            tab.configure(fg_color="transparent")
             self.tabs[tab_name] = tab
 
             if columns:  # Regular results tab
                 table = ResultsTable(tab, columns=columns)
-                table.pack(fill="both", expand=True, padx=5, pady=5)
+                table.pack(fill="both", expand=True, padx=4, pady=4)
                 self.tables[tab_name] = table
             else:  # Summary tab
                 self._setup_summary_tab(tab)
 
     def _setup_summary_tab(self, tab):
         """Set up the summary tab with overview cards."""
+        # Main container with scrolling
+        main_scroll = ctk.CTkScrollableFrame(tab, fg_color="transparent")
+        main_scroll.pack(fill="both", expand=True, padx=4, pady=4)
+
         # Top frame for summary cards
-        self.summary_cards_frame = ctk.CTkFrame(tab, fg_color="transparent")
-        self.summary_cards_frame.pack(fill="x", padx=10, pady=10)
+        self.summary_cards_frame = ctk.CTkFrame(main_scroll, fg_color="transparent")
+        self.summary_cards_frame.pack(fill="x", padx=8, pady=(8, 16))
 
         # Create placeholder cards
         self.summary_cards = {}
 
         cards_config = [
-            ('startup', 'Startup Items', '0', 'Programs starting with Windows'),
-            ('services', 'Third-Party Services', '0', 'Non-Microsoft auto-start services'),
-            ('processes', 'High Resource', '0', 'Processes using significant resources'),
-            ('disk', 'Disk Issues', '0', 'Drives with low space or issues'),
-            ('drivers', 'Driver Problems', '0', 'Drivers with errors'),
-            ('tasks', 'Scheduled Tasks', '0', 'Third-party scheduled tasks')
+            ('startup', 'Startup Items', '—', 'Programs starting with Windows'),
+            ('services', 'Third-Party Services', '—', 'Non-Microsoft auto-start services'),
+            ('processes', 'High Resource', '—', 'Processes using significant resources'),
+            ('disk', 'Disk Issues', '—', 'Drives with low space or issues'),
+            ('drivers', 'Driver Problems', '—', 'Drivers with errors'),
+            ('tasks', 'Scheduled Tasks', '—', 'Third-party scheduled tasks')
         ]
 
         for i, (key, title, value, subtitle) in enumerate(cards_config):
@@ -72,7 +88,7 @@ class ResultsPanel(ctk.CTkFrame):
                 subtitle=subtitle,
                 status='info'
             )
-            card.grid(row=i // 3, column=i % 3, padx=10, pady=10, sticky="nsew")
+            card.grid(row=i // 3, column=i % 3, padx=8, pady=8, sticky="nsew")
             self.summary_cards[key] = card
 
         # Configure grid weights
@@ -81,22 +97,33 @@ class ResultsPanel(ctk.CTkFrame):
         self.summary_cards_frame.rowconfigure(0, weight=1)
         self.summary_cards_frame.rowconfigure(1, weight=1)
 
-        # Recommendations frame
-        self.recommendations_frame = ctk.CTkFrame(tab)
-        self.recommendations_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
-
-        rec_label = ctk.CTkLabel(
-            self.recommendations_frame,
-            text="Recommendations",
-            font=ctk.CTkFont(size=16, weight="bold")
+        # Recommendations section header
+        rec_header = ctk.CTkLabel(
+            main_scroll,
+            text="RECOMMENDATIONS",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="bold"),
+            text_color=Colors.TEXT_MUTED
         )
-        rec_label.pack(anchor="w", padx=15, pady=(15, 10))
+        rec_header.pack(anchor="w", padx=16, pady=(8, 12))
 
-        self.recommendations_list = ctk.CTkScrollableFrame(
+        # Recommendations frame
+        self.recommendations_frame = ctk.CTkFrame(
+            main_scroll,
+            fg_color=Colors.BG_CARD,
+            corner_radius=8,
+            border_width=1,
+            border_color=Colors.BORDER
+        )
+        self.recommendations_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+
+        self.recommendations_list = ctk.CTkFrame(
             self.recommendations_frame,
             fg_color="transparent"
         )
-        self.recommendations_list.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.recommendations_list.pack(fill="both", expand=True, padx=12, pady=12)
+
+        # Initial empty state message
+        self._add_recommendation('info', 'Run a scan to see recommendations for improving system performance.')
 
     def load_startup_results(self, data: List[Dict[str, Any]]):
         """Load startup analysis results."""
@@ -104,9 +131,12 @@ class ResultsPanel(ctk.CTkFrame):
             table = self.tables['Startup']
             table.clear()
             for item in data:
+                path = item.get('path', '')
+                if len(path) > 50:
+                    path = path[:50] + '...'
                 table.add_row([
                     item.get('name', ''),
-                    item.get('path', '')[:50] + '...' if len(item.get('path', '')) > 50 else item.get('path', ''),
+                    path,
                     item.get('source', ''),
                     item.get('impact', 'Low')
                 ], item.get('impact', 'Low'))
@@ -117,9 +147,12 @@ class ResultsPanel(ctk.CTkFrame):
             table = self.tables['Services']
             table.clear()
             for item in data:
+                display_name = item.get('display_name', '')
+                if len(display_name) > 30:
+                    display_name = display_name[:30] + '...'
                 table.add_row([
                     item.get('name', ''),
-                    item.get('display_name', '')[:30] + '...' if len(item.get('display_name', '')) > 30 else item.get('display_name', ''),
+                    display_name,
                     item.get('status', ''),
                     item.get('type', ''),
                     item.get('severity', 'OK')
@@ -163,8 +196,11 @@ class ResultsPanel(ctk.CTkFrame):
             table = self.tables['Drivers']
             table.clear()
             for item in data:
+                name = item.get('name', '')
+                if len(name) > 40:
+                    name = name[:40] + '...'
                 table.add_row([
-                    item.get('name', '')[:40] + '...' if len(item.get('name', '')) > 40 else item.get('name', ''),
+                    name,
                     item.get('status', ''),
                     item.get('error_description', ''),
                     item.get('severity', 'OK')
@@ -245,7 +281,7 @@ class ResultsPanel(ctk.CTkFrame):
         if 'startup' in summaries:
             high_impact = summaries['startup'].get('High', 0)
             if high_impact > 5:
-                recommendations.append(('critical', f"You have {high_impact} high-impact startup programs. Consider disabling unnecessary ones in Task Manager > Startup."))
+                recommendations.append(('critical', f"You have {high_impact} high-impact startup programs. Consider disabling unnecessary ones in Task Manager → Startup tab."))
             elif high_impact > 2:
                 recommendations.append(('warning', f"You have {high_impact} high-impact startup programs that may slow boot time."))
 
@@ -253,7 +289,7 @@ class ResultsPanel(ctk.CTkFrame):
         if 'services' in summaries:
             third_party = summaries['services'].get('third_party', 0)
             if third_party > 15:
-                recommendations.append(('warning', f"You have {third_party} third-party services set to auto-start. Review and disable unnecessary services."))
+                recommendations.append(('warning', f"You have {third_party} third-party services set to auto-start. Review and disable unnecessary services using services.msc."))
 
         # Check processes
         if 'processes' in summaries:
@@ -264,45 +300,51 @@ class ResultsPanel(ctk.CTkFrame):
         # Check disk
         if 'disk' in summaries:
             if summaries['disk'].get('smart_warnings', 0) > 0:
-                recommendations.append(('critical', "SMART warnings detected! Back up your data immediately and consider replacing the drive."))
+                recommendations.append(('critical', "SMART warnings detected! Back up your data immediately and consider replacing the affected drive."))
             if summaries['disk'].get('low_space_drives', 0) > 0:
-                recommendations.append(('warning', "Low disk space detected. Free up space to improve system performance."))
+                recommendations.append(('warning', "Low disk space detected on one or more drives. Free up space to improve system performance."))
 
         # Check drivers
         if 'drivers' in summaries:
             critical_drivers = summaries['drivers'].get('critical', 0)
             if critical_drivers > 0:
-                recommendations.append(('critical', f"{critical_drivers} driver(s) have errors. Update or reinstall affected drivers."))
+                recommendations.append(('critical', f"{critical_drivers} driver(s) have errors. Update or reinstall affected drivers from Device Manager."))
 
         # Check scheduled tasks
         if 'scheduled' in summaries:
             warnings = summaries['scheduled'].get('warnings', 0)
             if warnings > 0:
-                recommendations.append(('info', f"{warnings} scheduled task(s) may affect startup performance."))
+                recommendations.append(('info', f"{warnings} scheduled task(s) run at startup which may affect boot performance."))
 
         # Add recommendations or show "all good" message
         if not recommendations:
-            recommendations.append(('ok', "No significant issues found. Your system appears to be in good health."))
+            recommendations.append(('ok', "No significant issues found. Your system appears to be running well."))
 
         for status, text in recommendations:
             self._add_recommendation(status, text)
 
     def _add_recommendation(self, status: str, text: str):
         """Add a recommendation to the list."""
-        frame = ctk.CTkFrame(self.recommendations_list, fg_color=("gray90", "gray20"))
-        frame.pack(fill="x", pady=3, padx=5)
+        frame = ctk.CTkFrame(
+            self.recommendations_list,
+            fg_color=Colors.BG_CARD_ALT,
+            corner_radius=6
+        )
+        frame.pack(fill="x", pady=4)
 
         indicator = StatusIndicator(frame, status=status)
-        indicator.pack(side="left", padx=(10, 5), pady=10)
+        indicator.pack(side="left", padx=12, pady=12)
 
         label = ctk.CTkLabel(
             frame,
             text=text,
-            font=ctk.CTkFont(size=12),
+            font=ctk.CTkFont(family="Segoe UI", size=12),
+            text_color=Colors.TEXT_PRIMARY,
             anchor="w",
-            wraplength=600
+            justify="left",
+            wraplength=700
         )
-        label.pack(side="left", fill="x", expand=True, padx=(0, 10), pady=10)
+        label.pack(side="left", fill="x", expand=True, padx=(0, 12), pady=12)
 
     def select_tab(self, tab_name: str):
         """Select a specific tab."""
