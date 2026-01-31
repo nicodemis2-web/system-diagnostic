@@ -220,10 +220,93 @@ Scheduled tasks run automatically at specified times or events. Poorly configure
 
 ---
 
+### 7. Hidden Process Detection
+
+**What it checks:**
+- Cross-references multiple process enumeration methods (psutil, WMI, tasklist)
+- Detects processes hiding from standard APIs (enumeration discrepancies)
+- Identifies process name mimicry (e.g., "svch0st.exe" impersonating "svchost.exe")
+- Flags executables running from suspicious locations (Temp, Downloads, AppData)
+- Detects orphan processes with missing parent processes
+
+**Why it matters:**
+Malware often attempts to hide from standard process enumeration tools or disguise itself as legitimate system processes. By comparing multiple enumeration sources, this tool can detect processes that may be deliberately evading detection.
+
+**Detection Types:**
+- **Enumeration Discrepancy** - Process visible to one API but not others (Critical)
+- **Name Mimicry** - Process name similar to system process but misspelled (Critical)
+- **Suspicious Location** - Executable in temp/downloads folder (Warning)
+- **Orphan Process** - Parent process no longer exists (Warning)
+- **Missing Path** - Cannot determine executable location (Warning)
+
+**Recommendation:** Investigate any processes flagged as Critical immediately. Use tools like Process Explorer or VirusTotal to verify suspicious processes.
+
+---
+
+### 8. Hidden Directory Detection
+
+**What it checks:**
+- Directories with Hidden+System attributes in key locations (C:\, C:\Windows, C:\ProgramData, AppData)
+- Alternate Data Streams (ADS) attached to files in user directories
+- Compares against whitelist of known legitimate hidden folders
+
+**Why it matters:**
+Malware often hides in directories with Hidden+System attributes to avoid casual detection. Alternate Data Streams are an NTFS feature that allows data to be attached to files invisibly - this can be abused to hide malicious payloads.
+
+**What it detects:**
+- **Hidden+System Directory** - Folders with both attributes set (commonly used by malware)
+- **Alternate Data Stream** - Hidden data streams attached to normal files
+- **Unknown Hidden Directory** - Hidden folders not in the known Windows whitelist
+
+**Whitelisted Folders:**
+System Volume Information, $Recycle.Bin, Recovery, Boot, WinSxS, and other legitimate Windows hidden directories are recognized and marked as OK.
+
+**Recommendation:** Investigate non-whitelisted Hidden+System directories. For ADS findings, determine if the attached stream is legitimate (some software uses ADS for metadata).
+
+---
+
+### 9. Network Connection Analysis
+
+**What it checks:**
+- All active TCP and UDP connections via psutil
+- Maps each connection to its owning process
+- Identifies orphaned connections (process no longer exists)
+- Flags connections using suspicious ports commonly used by malware
+- Detects external IP connections from unknown processes
+- Identifies services listening on all interfaces (0.0.0.0)
+
+**Why it matters:**
+Malware typically needs network connectivity for command-and-control, data exfiltration, or lateral movement. Analyzing network connections can reveal suspicious communication patterns.
+
+**Suspicious Ports Flagged:**
+- 4444, 4445 (Metasploit default)
+- 6666, 6667 (IRC, often used by botnets)
+- 31337 ("elite" - common backdoor port)
+- 12345, 54321 (NetBus, other trojans)
+- 1337 (common hacker culture port)
+
+**Severity Levels:**
+- **Critical** - Suspicious port detected, or orphaned connection to external IP
+- **Warning** - Orphaned connection, external connection from unknown process, or listening on all interfaces
+- **OK** - Normal connection with identifiable process
+
+**Recommendation:** Investigate any Critical connections immediately. For orphaned connections, determine what process created them before it terminated. Block suspicious ports at the firewall level.
+
+---
+
 ## Scan Types
 
 ### Full Scan
-Checks all six diagnostic categories. Takes longer but provides complete system analysis.
+Checks all nine diagnostic categories including security analysis. Takes longer but provides complete system analysis:
+1. Startup Programs
+2. Windows Services
+3. Process Resources
+4. Disk Health
+5. Driver Status
+6. Scheduled Tasks
+7. Hidden Processes (Security)
+8. Hidden Files/Directories (Security)
+9. Network Connections (Security)
 
 ### Quick Scan
 Checks only:
@@ -239,12 +322,19 @@ Use for a fast overview of immediate performance concerns.
 After scanning, the Summary tab displays:
 
 ### Metric Cards
+
+**Performance Diagnostics:**
 - **Startup Items** - Total programs starting with Windows
 - **Third-Party Services** - Non-Microsoft auto-start services
 - **High Resource** - Processes using excessive CPU/memory
 - **Disk Issues** - Drives with low space or health warnings
 - **Driver Problems** - Devices with errors
 - **Scheduled Tasks** - Third-party scheduled tasks
+
+**Security Diagnostics:**
+- **Hidden Processes** - Suspicious or hidden processes detected
+- **Hidden Files/Dirs** - Hidden directories and Alternate Data Streams
+- **Network Issues** - Suspicious network connections
 
 ### Color Coding
 - 🟢 **Green (OK)** - No issues detected
@@ -277,6 +367,9 @@ Some checks require administrator access:
 - SMART disk status (requires WMI access)
 - Certain service details
 - Some driver information
+- Full network connection visibility (without admin, only own connections visible)
+- System-wide hidden directory scanning (C:\Windows, C:\ProgramData)
+- Complete process enumeration across all users
 
 The tool displays "✓ Admin" or "⚠ Limited" in the toolbar.
 
@@ -388,7 +481,10 @@ system_diagnostic/
 │   ├── processes.py        # Process resource monitor
 │   ├── disk.py             # Disk health checker
 │   ├── drivers.py          # Driver status analyzer
-│   └── scheduled.py        # Scheduled tasks scanner
+│   ├── scheduled.py        # Scheduled tasks scanner
+│   ├── hidden_processes.py # Hidden/suspicious process detector
+│   ├── hidden_directories.py # Hidden directory and ADS scanner
+│   └── network_connections.py # Network connection analyzer
 │
 ├── ui/                     # User interface components
 │   ├── main_window.py      # Main application window
@@ -439,6 +535,14 @@ Users install dependencies with: `pip install -r requirements.txt`
 ---
 
 ## Version History
+
+**v1.1.0** - Security Diagnostics Update
+- Added hidden process detection (multi-source enumeration, mimicry detection)
+- Added hidden directory scanner (Hidden+System attributes, ADS detection)
+- Added network connection analysis (suspicious ports, orphaned connections)
+- New summary cards for security findings
+- Security-focused recommendations in Summary tab
+- Updated to 9 diagnostic categories
 
 **v1.0.0** - Initial Release
 - Startup programs analysis

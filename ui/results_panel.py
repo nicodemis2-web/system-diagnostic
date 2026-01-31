@@ -43,6 +43,9 @@ class ResultsPanel(ctk.CTkFrame):
             'Disk': ['Drive', 'File System', 'Total', 'Used', 'Free', 'SMART', 'Severity'],
             'Drivers': ['Name', 'Status', 'Error', 'Severity'],
             'Tasks': ['Name', 'Status', 'Trigger', 'Last Run', 'Type', 'Severity'],
+            'Hidden Proc': ['PID', 'Name', 'Path', 'Detection', 'Flags', 'Severity'],
+            'Hidden Files': ['Type', 'Path', 'Attributes', 'Size', 'Severity'],
+            'Network': ['Protocol', 'Local', 'Remote', 'Process', 'Status', 'Severity'],
             'Summary': []  # Special tab
         }
 
@@ -78,7 +81,10 @@ class ResultsPanel(ctk.CTkFrame):
             'processes': 'Processes',
             'disk': 'Disk',
             'drivers': 'Drivers',
-            'tasks': 'Tasks'
+            'tasks': 'Tasks',
+            'hidden_processes': 'Hidden Proc',
+            'hidden_files': 'Hidden Files',
+            'network': 'Network'
         }
 
         cards_config = [
@@ -87,7 +93,10 @@ class ResultsPanel(ctk.CTkFrame):
             ('processes', 'High Resource', '—', 'Processes using significant resources'),
             ('disk', 'Disk Issues', '—', 'Drives with low space or issues'),
             ('drivers', 'Driver Problems', '—', 'Drivers with errors'),
-            ('tasks', 'Scheduled Tasks', '—', 'Third-party scheduled tasks')
+            ('tasks', 'Scheduled Tasks', '—', 'Third-party scheduled tasks'),
+            ('hidden_processes', 'Hidden Processes', '—', 'Suspicious or hidden processes'),
+            ('hidden_files', 'Hidden Files/Dirs', '—', 'Hidden directories and ADS'),
+            ('network', 'Network Issues', '—', 'Suspicious connections')
         ]
 
         for i, (key, title, value, subtitle) in enumerate(cards_config):
@@ -111,6 +120,7 @@ class ResultsPanel(ctk.CTkFrame):
             self.summary_cards_frame.columnconfigure(i, weight=1)
         self.summary_cards_frame.rowconfigure(0, weight=1)
         self.summary_cards_frame.rowconfigure(1, weight=1)
+        self.summary_cards_frame.rowconfigure(2, weight=1)
 
         # Recommendations section header
         rec_header = ctk.CTkLabel(
@@ -236,6 +246,68 @@ class ResultsPanel(ctk.CTkFrame):
                     item.get('severity', 'OK')
                 ], item.get('severity', 'OK'))
 
+    def load_hidden_processes_results(self, data: List[Dict[str, Any]]):
+        """Load hidden process analysis results."""
+        if 'Hidden Proc' in self.tables:
+            table = self.tables['Hidden Proc']
+            table.clear()
+            for item in data:
+                path = item.get('path', '')
+                if len(path) > 40:
+                    path = '...' + path[-37:]
+                flags = ', '.join(item.get('flags', []))
+                if len(flags) > 30:
+                    flags = flags[:27] + '...'
+                table.add_row([
+                    str(item.get('pid', '')),
+                    item.get('name', ''),
+                    path,
+                    item.get('detection_method', ''),
+                    flags,
+                    item.get('severity', 'OK')
+                ], item.get('severity', 'OK'))
+
+    def load_hidden_files_results(self, data: List[Dict[str, Any]]):
+        """Load hidden files/directories analysis results."""
+        if 'Hidden Files' in self.tables:
+            table = self.tables['Hidden Files']
+            table.clear()
+            for item in data:
+                path = item.get('path', '')
+                if len(path) > 50:
+                    path = '...' + path[-47:]
+                table.add_row([
+                    item.get('type', ''),
+                    path,
+                    item.get('attributes', ''),
+                    item.get('size', ''),
+                    item.get('severity', 'OK')
+                ], item.get('severity', 'OK'))
+
+    def load_network_results(self, data: List[Dict[str, Any]]):
+        """Load network connection analysis results."""
+        if 'Network' in self.tables:
+            table = self.tables['Network']
+            table.clear()
+            for item in data:
+                local = item.get('local_display', '')
+                remote = item.get('remote_display', '')
+                if len(local) > 25:
+                    local = local[:22] + '...'
+                if len(remote) > 25:
+                    remote = remote[:22] + '...'
+                process = item.get('process_name', '')
+                if item.get('pid'):
+                    process = f"{process} ({item.get('pid')})"
+                table.add_row([
+                    item.get('protocol', ''),
+                    local,
+                    remote,
+                    process,
+                    item.get('status', ''),
+                    item.get('severity', 'OK')
+                ], item.get('severity', 'OK'))
+
     def update_summary(self, summaries: Dict[str, Dict[str, Any]]):
         """Update the summary tab with collected data."""
         # Update startup card
@@ -280,6 +352,30 @@ class ResultsPanel(ctk.CTkFrame):
             count = s.get('third_party', 0)
             status = 'warning' if s.get('warnings', 0) > 0 else 'ok'
             self.summary_cards['tasks'].update_value(str(count), status)
+
+        # Update hidden processes card
+        if 'hidden_processes' in summaries:
+            s = summaries['hidden_processes']
+            count = s.get('total', 0)
+            critical = s.get('Critical', 0)
+            warning = s.get('Warning', 0)
+            status = 'critical' if critical > 0 else 'warning' if warning > 0 else 'ok'
+            self.summary_cards['hidden_processes'].update_value(str(count), status)
+
+        # Update hidden files card
+        if 'hidden_files' in summaries:
+            s = summaries['hidden_files']
+            suspicious = s.get('suspicious', 0)
+            status = 'warning' if suspicious > 0 else 'ok'
+            self.summary_cards['hidden_files'].update_value(str(suspicious), status)
+
+        # Update network card
+        if 'network' in summaries:
+            s = summaries['network']
+            issues = s.get('suspicious', 0) + s.get('orphaned', 0)
+            critical = s.get('Critical', 0)
+            status = 'critical' if critical > 0 else 'warning' if issues > 0 else 'ok'
+            self.summary_cards['network'].update_value(str(issues), status)
 
         # Generate recommendations
         self._generate_recommendations(summaries)
@@ -330,6 +426,39 @@ class ResultsPanel(ctk.CTkFrame):
             warnings = summaries['scheduled'].get('warnings', 0)
             if warnings > 0:
                 recommendations.append(('info', f"{warnings} scheduled task(s) run at startup which may affect boot performance."))
+
+        # Check hidden processes
+        if 'hidden_processes' in summaries:
+            s = summaries['hidden_processes']
+            critical = s.get('Critical', 0)
+            discrepancies = s.get('discrepancies', 0)
+            mimicry = s.get('mimicry', 0)
+            if mimicry > 0:
+                recommendations.append(('critical', f"{mimicry} process(es) detected with names mimicking system processes. This may indicate malware."))
+            if discrepancies > 0:
+                recommendations.append(('critical', f"{discrepancies} process(es) found hiding from standard enumeration APIs. Investigate immediately."))
+            if critical > 0 and mimicry == 0 and discrepancies == 0:
+                recommendations.append(('warning', f"{critical} suspicious process(es) detected. Check the Hidden Proc tab for details."))
+
+        # Check hidden files
+        if 'hidden_files' in summaries:
+            s = summaries['hidden_files']
+            suspicious = s.get('suspicious', 0)
+            ads = s.get('ads', 0)
+            if ads > 0:
+                recommendations.append(('warning', f"{ads} Alternate Data Stream(s) found. These can be used to hide malicious content."))
+            if suspicious > 0:
+                recommendations.append(('warning', f"{suspicious} suspicious hidden director(ies) found outside known system locations."))
+
+        # Check network connections
+        if 'network' in summaries:
+            s = summaries['network']
+            suspicious_ports = s.get('suspicious', 0)
+            orphaned = s.get('orphaned', 0)
+            if suspicious_ports > 0:
+                recommendations.append(('critical', f"{suspicious_ports} connection(s) using suspicious ports commonly used by malware. Investigate immediately."))
+            if orphaned > 0:
+                recommendations.append(('warning', f"{orphaned} orphaned network connection(s) found (process no longer exists)."))
 
         # Add recommendations or show "all good" message
         if not recommendations:

@@ -17,7 +17,10 @@ from diagnostics import (
     ProcessAnalyzer,
     DiskAnalyzer,
     DriverAnalyzer,
-    ScheduledTasksAnalyzer
+    ScheduledTasksAnalyzer,
+    HiddenProcessAnalyzer,
+    HiddenDirectoryAnalyzer,
+    NetworkConnectionAnalyzer
 )
 
 
@@ -43,6 +46,9 @@ class MainWindow(ctk.CTk):
         self.disk_analyzer = DiskAnalyzer()
         self.driver_analyzer = DriverAnalyzer()
         self.scheduled_analyzer = ScheduledTasksAnalyzer()
+        self.hidden_process_analyzer = HiddenProcessAnalyzer()
+        self.hidden_directory_analyzer = HiddenDirectoryAnalyzer()
+        self.network_analyzer = NetworkConnectionAnalyzer()
 
         # Report generator
         self.report_generator = ReportGenerator()
@@ -300,12 +306,15 @@ class MainWindow(ctk.CTk):
         """Perform full scan in background thread."""
         try:
             steps = [
-                ("Analyzing startup programs...", self._scan_startup, 0.1),
-                ("Scanning Windows services...", self._scan_services, 0.25),
-                ("Monitoring process resources...", self._scan_processes, 0.45),
-                ("Checking disk health...", self._scan_disk, 0.6),
-                ("Analyzing drivers...", self._scan_drivers, 0.75),
-                ("Scanning scheduled tasks...", self._scan_scheduled, 0.9),
+                ("Analyzing startup programs...", self._scan_startup, 0.08),
+                ("Scanning Windows services...", self._scan_services, 0.18),
+                ("Monitoring process resources...", self._scan_processes, 0.35),
+                ("Checking disk health...", self._scan_disk, 0.45),
+                ("Analyzing drivers...", self._scan_drivers, 0.55),
+                ("Scanning scheduled tasks...", self._scan_scheduled, 0.65),
+                ("Detecting hidden processes...", self._scan_hidden_processes, 0.74),
+                ("Scanning for hidden files...", self._scan_hidden_files, 0.86),
+                ("Analyzing network connections...", self._scan_network, 0.95),
             ]
 
             for status, func, progress in steps:
@@ -378,6 +387,27 @@ class MainWindow(ctk.CTk):
         self.summaries['scheduled'] = self.scheduled_analyzer.get_summary()
         self.after(0, lambda: self.results_panel.load_tasks_results(results))
 
+    def _scan_hidden_processes(self):
+        """Scan for hidden or suspicious processes."""
+        results = self.hidden_process_analyzer.scan()
+        self.scan_results['hidden_processes'] = results
+        self.summaries['hidden_processes'] = self.hidden_process_analyzer.get_summary()
+        self.after(0, lambda: self.results_panel.load_hidden_processes_results(results))
+
+    def _scan_hidden_files(self):
+        """Scan for hidden directories and ADS."""
+        results = self.hidden_directory_analyzer.scan()
+        self.scan_results['hidden_files'] = results
+        self.summaries['hidden_files'] = self.hidden_directory_analyzer.get_summary()
+        self.after(0, lambda: self.results_panel.load_hidden_files_results(results))
+
+    def _scan_network(self):
+        """Scan network connections."""
+        results = self.network_analyzer.scan()
+        self.scan_results['network'] = results
+        self.summaries['network'] = self.network_analyzer.get_summary()
+        self.after(0, lambda: self.results_panel.load_network_results(results))
+
     def _scan_complete(self):
         """Handle scan completion."""
         self.is_scanning = False
@@ -396,7 +426,10 @@ class MainWindow(ctk.CTk):
         total_issues = (
             self.summaries.get('startup', {}).get('High', 0) +
             self.summaries.get('drivers', {}).get('critical', 0) +
-            self.summaries.get('disk', {}).get('low_space_drives', 0)
+            self.summaries.get('disk', {}).get('low_space_drives', 0) +
+            self.summaries.get('hidden_processes', {}).get('Critical', 0) +
+            self.summaries.get('hidden_files', {}).get('suspicious', 0) +
+            self.summaries.get('network', {}).get('Critical', 0)
         )
 
         if total_issues > 0:
