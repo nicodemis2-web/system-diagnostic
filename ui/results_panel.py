@@ -45,7 +45,6 @@ class ResultsPanel(ctk.CTkFrame):
             'Tasks': ['Name', 'Status', 'Trigger', 'Last Run', 'Type', 'Severity'],
             'Hidden Proc': ['PID', 'Name', 'Path', 'Detection', 'Flags', 'Severity'],
             'Hidden Files': ['Type', 'Path', 'Attributes', 'Size', 'Severity'],
-            'Network': ['Protocol', 'Local', 'Remote', 'Process', 'Status', 'Severity'],
             'Summary': []  # Special tab
         }
 
@@ -55,8 +54,27 @@ class ResultsPanel(ctk.CTkFrame):
             self.tabs[tab_name] = tab
 
             if columns:  # Regular results tab
-                table = ResultsTable(tab, columns=columns)
-                table.pack(fill="both", expand=True, padx=4, pady=4)
+                # Create container for table and back button
+                container = ctk.CTkFrame(tab, fg_color="transparent")
+                container.pack(fill="both", expand=True, padx=4, pady=4)
+
+                # Back to Dashboard button at top
+                back_btn = ctk.CTkButton(
+                    container,
+                    text="← Go Back to Dashboard",
+                    command=lambda: self.select_tab("Summary"),
+                    fg_color=Colors.BG_CARD,
+                    hover_color=Colors.BG_CARD_ALT,
+                    text_color=Colors.TEXT_PRIMARY,
+                    font=ctk.CTkFont(family="Segoe UI", size=12),
+                    height=32,
+                    width=180,
+                    corner_radius=6
+                )
+                back_btn.pack(anchor="w", pady=(0, 8))
+
+                table = ResultsTable(container, columns=columns)
+                table.pack(fill="both", expand=True)
                 self.tables[tab_name] = table
             else:  # Summary tab
                 self._setup_summary_tab(tab)
@@ -83,8 +101,7 @@ class ResultsPanel(ctk.CTkFrame):
             'drivers': 'Drivers',
             'tasks': 'Tasks',
             'hidden_processes': 'Hidden Proc',
-            'hidden_files': 'Hidden Files',
-            'network': 'Network'
+            'hidden_files': 'Hidden Files'
         }
 
         cards_config = [
@@ -95,8 +112,7 @@ class ResultsPanel(ctk.CTkFrame):
             ('drivers', 'Driver Problems', '—', 'Drivers with errors'),
             ('tasks', 'Scheduled Tasks', '—', 'Third-party scheduled tasks'),
             ('hidden_processes', 'Hidden Processes', '—', 'Suspicious or hidden processes'),
-            ('hidden_files', 'Hidden Files/Dirs', '—', 'Hidden directories and ADS'),
-            ('network', 'Network Issues', '—', 'Suspicious connections')
+            ('hidden_files', 'Hidden Files/Dirs', '—', 'Hidden directories and ADS')
         ]
 
         for i, (key, title, value, subtitle) in enumerate(cards_config):
@@ -115,12 +131,11 @@ class ResultsPanel(ctk.CTkFrame):
             card.grid(row=i // 3, column=i % 3, padx=8, pady=8, sticky="nsew")
             self.summary_cards[key] = card
 
-        # Configure grid weights
+        # Configure grid weights (8 cards = 3 rows with 3, 3, 2 cards)
         for i in range(3):
             self.summary_cards_frame.columnconfigure(i, weight=1)
-        self.summary_cards_frame.rowconfigure(0, weight=1)
-        self.summary_cards_frame.rowconfigure(1, weight=1)
-        self.summary_cards_frame.rowconfigure(2, weight=1)
+        for i in range(3):
+            self.summary_cards_frame.rowconfigure(i, weight=1)
 
         # Recommendations section header
         rec_header = ctk.CTkLabel(
@@ -284,30 +299,6 @@ class ResultsPanel(ctk.CTkFrame):
                     item.get('severity', 'OK')
                 ], item.get('severity', 'OK'))
 
-    def load_network_results(self, data: List[Dict[str, Any]]):
-        """Load network connection analysis results."""
-        if 'Network' in self.tables:
-            table = self.tables['Network']
-            table.clear()
-            for item in data:
-                local = item.get('local_display', '')
-                remote = item.get('remote_display', '')
-                if len(local) > 25:
-                    local = local[:22] + '...'
-                if len(remote) > 25:
-                    remote = remote[:22] + '...'
-                process = item.get('process_name', '')
-                if item.get('pid'):
-                    process = f"{process} ({item.get('pid')})"
-                table.add_row([
-                    item.get('protocol', ''),
-                    local,
-                    remote,
-                    process,
-                    item.get('status', ''),
-                    item.get('severity', 'OK')
-                ], item.get('severity', 'OK'))
-
     def update_summary(self, summaries: Dict[str, Dict[str, Any]]):
         """Update the summary tab with collected data."""
         # Update startup card
@@ -368,19 +359,6 @@ class ResultsPanel(ctk.CTkFrame):
             suspicious = s.get('suspicious', 0)
             status = 'warning' if suspicious > 0 else 'ok'
             self.summary_cards['hidden_files'].update_value(str(suspicious), status)
-
-        # Update network card
-        if 'network' in summaries:
-            s = summaries['network']
-            scan_error = s.get('scan_error')
-            if scan_error:
-                # Show error state if scan failed/timed out
-                self.summary_cards['network'].update_value('!', 'warning')
-            else:
-                issues = s.get('suspicious', 0) + s.get('orphaned', 0)
-                critical = s.get('Critical', 0)
-                status = 'critical' if critical > 0 else 'warning' if issues > 0 else 'ok'
-                self.summary_cards['network'].update_value(str(issues), status)
 
         # Generate recommendations
         self._generate_recommendations(summaries)
@@ -454,20 +432,6 @@ class ResultsPanel(ctk.CTkFrame):
                 recommendations.append(('warning', f"{ads} Alternate Data Stream(s) found. These can be used to hide malicious content."))
             if suspicious > 0:
                 recommendations.append(('warning', f"{suspicious} suspicious hidden director(ies) found outside known system locations."))
-
-        # Check network connections
-        if 'network' in summaries:
-            s = summaries['network']
-            scan_error = s.get('scan_error')
-            if scan_error:
-                recommendations.append(('warning', f"Network scan encountered an issue: {scan_error}. Try running as Administrator."))
-            else:
-                suspicious_ports = s.get('suspicious', 0)
-                orphaned = s.get('orphaned', 0)
-                if suspicious_ports > 0:
-                    recommendations.append(('critical', f"{suspicious_ports} connection(s) using suspicious ports commonly used by malware. Investigate immediately."))
-                if orphaned > 0:
-                    recommendations.append(('warning', f"{orphaned} orphaned network connection(s) found (process no longer exists)."))
 
         # Add recommendations or show "all good" message
         if not recommendations:

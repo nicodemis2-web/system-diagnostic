@@ -19,8 +19,7 @@ from diagnostics import (
     DriverAnalyzer,
     ScheduledTasksAnalyzer,
     HiddenProcessAnalyzer,
-    HiddenDirectoryAnalyzer,
-    NetworkConnectionAnalyzer
+    HiddenDirectoryAnalyzer
 )
 
 
@@ -48,7 +47,6 @@ class MainWindow(ctk.CTk):
         self.scheduled_analyzer = ScheduledTasksAnalyzer()
         self.hidden_process_analyzer = HiddenProcessAnalyzer()
         self.hidden_directory_analyzer = HiddenDirectoryAnalyzer()
-        self.network_analyzer = NetworkConnectionAnalyzer()
 
         # Report generator
         self.report_generator = ReportGenerator()
@@ -312,9 +310,8 @@ class MainWindow(ctk.CTk):
                 ("Checking disk health...", self._scan_disk, 0.45),
                 ("Analyzing drivers...", self._scan_drivers, 0.55),
                 ("Scanning scheduled tasks...", self._scan_scheduled, 0.65),
-                ("Detecting hidden processes...", self._scan_hidden_processes, 0.74),
-                ("Scanning for hidden files...", self._scan_hidden_files, 0.86),
-                ("Analyzing network connections...", self._scan_network, 0.95),
+                ("Detecting hidden processes...", self._scan_hidden_processes, 0.80),
+                ("Scanning for hidden files...", self._scan_hidden_files, 0.95),
             ]
 
             for status, func, progress in steps:
@@ -401,13 +398,6 @@ class MainWindow(ctk.CTk):
         self.summaries['hidden_files'] = self.hidden_directory_analyzer.get_summary()
         self.after(0, lambda: self.results_panel.load_hidden_files_results(results))
 
-    def _scan_network(self):
-        """Scan network connections."""
-        results = self.network_analyzer.scan()
-        self.scan_results['network'] = results
-        self.summaries['network'] = self.network_analyzer.get_summary()
-        self.after(0, lambda: self.results_panel.load_network_results(results))
-
     def _scan_complete(self):
         """Handle scan completion."""
         self.is_scanning = False
@@ -428,8 +418,7 @@ class MainWindow(ctk.CTk):
             self.summaries.get('drivers', {}).get('critical', 0) +
             self.summaries.get('disk', {}).get('low_space_drives', 0) +
             self.summaries.get('hidden_processes', {}).get('Critical', 0) +
-            self.summaries.get('hidden_files', {}).get('suspicious', 0) +
-            self.summaries.get('network', {}).get('Critical', 0)
+            self.summaries.get('hidden_files', {}).get('suspicious', 0)
         )
 
         if total_issues > 0:

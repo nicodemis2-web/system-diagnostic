@@ -8,7 +8,6 @@ from diagnostics.drivers import DriverAnalyzer
 from diagnostics.scheduled import ScheduledTasksAnalyzer
 from diagnostics.hidden_processes import HiddenProcessAnalyzer
 from diagnostics.hidden_directories import HiddenDirectoryAnalyzer
-from diagnostics.network_connections import NetworkConnectionAnalyzer
 
 __all__ = [
     'StartupAnalyzer',
@@ -18,6 +17,5 @@ __all__ = [
     'DriverAnalyzer',
     'ScheduledTasksAnalyzer',
     'HiddenProcessAnalyzer',
-    'HiddenDirectoryAnalyzer',
-    'NetworkConnectionAnalyzer'
+    'HiddenDirectoryAnalyzer'
 ]
