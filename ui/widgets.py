@@ -238,16 +238,21 @@ class ResultsTable(ctk.CTkScrollableFrame):
 
 
 class SummaryCard(ctk.CTkFrame):
-    """A summary card widget showing key metrics."""
+    """A summary card widget showing key metrics. Clickable to view details."""
 
-    def __init__(self, master, title: str, value: str, subtitle: str = '', status: str = 'info', **kwargs):
+    def __init__(self, master, title: str, value: str, subtitle: str = '', status: str = 'info', command: Callable = None, **kwargs):
         super().__init__(master, **kwargs)
+
+        self.command = command
+        self.default_bg = Colors.BG_CARD
+        self.hover_bg = Colors.BG_CARD_ALT
 
         self.configure(
             corner_radius=8,
-            fg_color=Colors.BG_CARD,
+            fg_color=self.default_bg,
             border_width=1,
-            border_color=Colors.BORDER
+            border_color=Colors.BORDER,
+            cursor="hand2" if command else "arrow"
         )
 
         self.title_label = ctk.CTkLabel(
@@ -282,9 +287,53 @@ class SummaryCard(ctk.CTkFrame):
                 font=ctk.CTkFont(family="Segoe UI", size=11),
                 text_color=Colors.TEXT_SECONDARY
             )
-            self.subtitle_label.pack(pady=(0, 16), padx=16, anchor="w")
+            self.subtitle_label.pack(pady=(0, 12), padx=16, anchor="w")
         else:
-            self.value_label.pack_configure(pady=(0, 16))
+            self.value_label.pack_configure(pady=(0, 12))
+
+        # "View details" link
+        self.details_label = ctk.CTkLabel(
+            self,
+            text="View details →",
+            font=ctk.CTkFont(family="Segoe UI", size=11),
+            text_color=Colors.PRIMARY_BLUE
+        )
+        self.details_label.pack(pady=(0, 16), padx=16, anchor="w")
+
+        # Bind click events to card and all children
+        if command:
+            self._bind_click_events()
+
+    def _bind_click_events(self):
+        """Bind click and hover events to card and children."""
+        widgets = [self, self.title_label, self.value_label, self.details_label]
+        if hasattr(self, 'subtitle_label'):
+            widgets.append(self.subtitle_label)
+
+        for widget in widgets:
+            widget.bind("<Button-1>", self._on_click)
+            widget.bind("<Enter>", self._on_enter)
+            widget.bind("<Leave>", self._on_leave)
+
+    def _on_click(self, event):
+        """Handle click event."""
+        if self.command:
+            self.command()
+
+    def _on_enter(self, event):
+        """Handle mouse enter - show hover state."""
+        self.configure(fg_color=self.hover_bg, border_color=Colors.PRIMARY_BLUE)
+
+    def _on_leave(self, event):
+        """Handle mouse leave - restore normal state."""
+        self.configure(fg_color=self.default_bg, border_color=Colors.BORDER)
+
+    def set_command(self, command: Callable):
+        """Set or update the click command."""
+        self.command = command
+        self.configure(cursor="hand2" if command else "arrow")
+        if command:
+            self._bind_click_events()
 
     def update_value(self, value: str, status: str = None):
         """Update the displayed value."""

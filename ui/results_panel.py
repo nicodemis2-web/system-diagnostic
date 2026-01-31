@@ -68,8 +68,18 @@ class ResultsPanel(ctk.CTkFrame):
         self.summary_cards_frame = ctk.CTkFrame(main_scroll, fg_color="transparent")
         self.summary_cards_frame.pack(fill="x", padx=8, pady=(8, 16))
 
-        # Create placeholder cards
+        # Create placeholder cards with click handlers to navigate to tabs
         self.summary_cards = {}
+
+        # Map card keys to tab names
+        card_to_tab = {
+            'startup': 'Startup',
+            'services': 'Services',
+            'processes': 'Processes',
+            'disk': 'Disk',
+            'drivers': 'Drivers',
+            'tasks': 'Tasks'
+        }
 
         cards_config = [
             ('startup', 'Startup Items', '—', 'Programs starting with Windows'),
@@ -81,12 +91,17 @@ class ResultsPanel(ctk.CTkFrame):
         ]
 
         for i, (key, title, value, subtitle) in enumerate(cards_config):
+            # Create click handler for this card
+            tab_name = card_to_tab[key]
+            command = lambda t=tab_name: self.select_tab(t)
+
             card = SummaryCard(
                 self.summary_cards_frame,
                 title=title,
                 value=value,
                 subtitle=subtitle,
-                status='info'
+                status='info',
+                command=command
             )
             card.grid(row=i // 3, column=i % 3, padx=8, pady=8, sticky="nsew")
             self.summary_cards[key] = card
